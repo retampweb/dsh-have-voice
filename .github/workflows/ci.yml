@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: syntax
+        run: |
+          python -m compileall -q src mcp tests narrator examples
+          for f in install.sh fetch-model.sh skill/install.sh vox; do bash -n "$f"; done
+
+      - name: unit tests
+        run: python tests/test_units.py
+
+      - name: mcp protocol
+        run: python tests/test_protocol.py
+
+      - name: no local paths, no secrets
+        run: |
+          if grep -rInE '/home/[a-z]|gho_[A-Za-z0-9]{20,}|github_pat_|BEGIN [A-Z ]*PRIVATE KEY' \
+               --exclude-dir=.git --exclude-dir=.github --exclude=*.mp3 . ; then
+            echo "::error::sensitive string found"
+            exit 1
+          fi
+          echo "clean"
+
+      - name: docs exist
+        run: |
+          test -f README.md && test -f README.zh.md && test -f LICENSE && test -f docs/demo.mp3

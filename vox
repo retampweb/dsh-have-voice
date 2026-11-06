@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# vox — say | serve | status | digest | listen. Kokoro-82M on CPU, English, ~2x real time.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+PORT="${VOX_PORT:-8765}"
+
+case "${1:-}" in
+  say)
+    shift; TEXT="${1:?usage: vox say \"text\" [af_heart|bf_emma|af_bella|af_nicole|af_sarah|am_michael]}"; shift || true
+    VOICE="${1:-af_heart}"
+    if curl -sf -m 0.3 "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
+      exec curl -s -m 5 "http://127.0.0.1:$PORT/say" -H 'content-type: application/json' \
+        -d "$(python3 -c 'import json,sys;print(json.dumps({"text":sys.argv[1],"voice":sys.argv[2]}))' "$TEXT" "$VOICE")"
+    fi
+    echo '{"ok":false,"error":"daemon down: run `vox serve`"}' ;;
+  serve)  shift; exec python3 "$HERE/src/voxd.py" --port "$PORT" "$@" ;;
+  status) exec curl -s -m 2 "http://127.0.0.1:$PORT/health" || echo '{"ok":false,"daemon":"down"}' ;;
+  listen) shift; exec python3 "$HERE/src/stt.py" "$@" ;;
+  digest) shift; exec python3 "$HERE/examples/digest.py" "$@" ;;
+  *) sed -n '2p' "$0"; exit 1 ;;
+esac
